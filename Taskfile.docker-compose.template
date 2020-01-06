@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+PATH=./bin:./vendor/bin:$PATH
+
+# Import .env file as environment variables
+[ -f .env ] && export $(grep -v '^#' .env | xargs -d '\n')
+
+# PROJECT_NAME defaults to name of the current directory.
+PROJECT_NAME=${PROJECT_NAME:-${PWD##*/}}
+
+# Or you can use COMPOSE_PROJECT_NAME variable and delete all specifications
+# of `-p` parameter from docker-compose command.
+#COMPOSE_PROJECT_NAME=$PROJECT_NAME
+
+# Note. If you change this, you also need to update docker-compose.yml.
+# only useful in a setting with multiple services.
+SERVICE_TARGET=${SERVICE_TARGET:-php}
+
+function default {
+    it
+}
+
+function it {
+    echo "I'm runnint!"
+}
+
+function up {
+    echo "Starting up containers for ${PROJECT_NAME}..."
+    docker-compose -p ${PROJECT_NAME} pull
+    docker-compose -p ${PROJECT_NAME} up -d --remove-orphans
+}
+
+function down {
+    stop
+}
+
+function start {
+    echo "Starting containers for ${PROJECT_NAME} from where you left off..."
+    docker-compose -p ${PROJECT_NAME} start
+}
+
+function stop {
+    echo "Stopping containers for ${PROJECT_NAME}..."
+    docker-compose -p ${PROJECT_NAME} stop
+}
+
+function restart {
+    stop && start
+}
+
+function prune {
+    echo "Removing containers for ${PROJECT_NAME}..."
+    docker-compose -p ${PROJECT_NAME} down --remove-orphans --volumes
+}
+
+function ps {
+    docker-compose -p ${PROJECT_NAME} ps
+}
+
+function logs {
+    docker-compose -p ${PROJECT_NAME} logs --follow ${@}
+}
+
+function shell {
+    CMD=${@}
+    if [ -z "${CMD}" ]; then
+        # no command is given, default to shell
+        docker-compose -p ${PROJECT_NAME} exec ${SERVICE_TARGET} bash
+    else
+        # run the command
+        docker-compose -p ${PROJECT_NAME} exec ${SERVICE_TARGET} bash -c "${CMD}"
+    fi
+}
+
+function help {
+    echo "$0 <task> <args>"
+    echo "Tasks:"
+    compgen -A function | cat -n
+}
+
+TIMEFORMAT="Task completed in %3lR"
+time ${@:-default}
+
+# Unset all environment variables from .env file loaded at beginning
+[ -f .env ] && unset $(grep -v '^#' .env | sed -E 's/(.*)=.*/\1/' | xargs)
+
+unset PATH
